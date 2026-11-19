@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "FlowChart",
+    "slug": "flowchart",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#F7F8FC"
+    },
+    "assetBundlePatterns": ["**/*"]
+  }
+}
