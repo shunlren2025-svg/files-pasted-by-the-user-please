@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import {
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   SafeAreaView,
@@ -30,6 +31,16 @@ const colors = {
   line: '#E8EAF2',
 };
 
+const HOLIDAYS = {
+  US: [
+    ['01-01', "New Year's Day"], ['01-19', 'Martin Luther King Jr. Day'], ['02-16', "Presidents' Day"],
+    ['05-25', 'Memorial Day'], ['06-19', 'Juneteenth'], ['07-04', 'Independence Day'], ['09-07', 'Labor Day'],
+    ['10-12', 'Columbus Day'], ['11-11', 'Veterans Day'], ['11-26', 'Thanksgiving Day'], ['12-25', 'Christmas Day'],
+  ],
+  CA: [['01-01', "New Year's Day"], ['07-01', 'Canada Day'], ['09-07', 'Labour Day'], ['10-12', 'Thanksgiving Day'], ['12-25', 'Christmas Day']],
+  UK: [['01-01', "New Year's Day"], ['04-03', 'Good Friday'], ['05-04', 'Early May Bank Holiday'], ['08-31', 'Summer Bank Holiday'], ['12-25', 'Christmas Day'], ['12-26', 'Boxing Day']],
+};
+
 function formatDue(value) {
   if (!value) return 'No time set';
   return value;
@@ -40,12 +51,62 @@ function getTimeLabel(value) {
   return match ? match[0] : 'Any time';
 }
 
+function getWeekDays(anchor) {
+  const start = new Date(anchor);
+  start.setDate(start.getDate() - start.getDay());
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    return date;
+  });
+}
+
+function getMonthCells(anchor) {
+  const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+  const start = new Date(first);
+  start.setDate(first.getDate() - first.getDay());
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    return date;
+  });
+}
+
+function sameDay(first, second) {
+  return first.getFullYear() === second.getFullYear() && first.getMonth() === second.getMonth() && first.getDate() === second.getDate();
+}
+
+function nthWeekday(year, month, weekday, nth) {
+  const date = new Date(year, month, 1);
+  date.setDate(1 + ((weekday - date.getDay() + 7) % 7) + (nth - 1) * 7);
+  return date;
+}
+
+function lastWeekday(year, month, weekday) {
+  const date = new Date(year, month + 1, 0);
+  date.setDate(date.getDate() - ((date.getDay() - weekday + 7) % 7));
+  return date;
+}
+
+function getHolidayLabel(date, country) {
+  const key = `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const fixed = (HOLIDAYS[country] || HOLIDAYS.US).find(([holidayKey]) => holidayKey === key);
+  if (fixed) return fixed[1];
+  if (country === 'US') {
+    const year = date.getFullYear();
+    const floating = [[nthWeekday(year, 0, 1, 3), 'Martin Luther King Jr. Day'], [nthWeekday(year, 1, 1, 3), "Presidents' Day"], [lastWeekday(year, 4, 1), 'Memorial Day'], [nthWeekday(year, 8, 1, 1), 'Labor Day'], [nthWeekday(year, 9, 1, 2), 'Columbus Day'], [nthWeekday(year, 10, 4, 4), 'Thanksgiving Day']];
+    return floating.find(([holidayDate]) => sameDay(holidayDate, date))?.[1] || '';
+  }
+  return '';
+}
+
 export default function App() {
   const [tab, setTab] = useState('planner');
   const [tasks, setTasks] = useState([]);
   const [newTask, setNewTask] = useState('');
   const [newDue, setNewDue] = useState('Today · 4:00 PM');
   const [newRepeat, setNewRepeat] = useState('Never');
+  const [newLocation, setNewLocation] = useState('');
   const [helperUrl, setHelperUrl] = useState(DEFAULT_HELPER_URL);
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
@@ -53,6 +114,9 @@ export default function App() {
   const [loaded, setLoaded] = useState(false);
   const [recording, setRecording] = useState(false);
   const recorderRef = useRef(null);
+  const [calendarMode, setCalendarMode] = useState('week');
+  const [holidayCountry, setHolidayCountry] = useState('US');
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
   useEffect(() => {
     Promise.all([AsyncStorage.getItem(TASKS_KEY), AsyncStorage.getItem(HELPER_KEY)]).then(([savedTasks, savedUrl]) => {
@@ -73,8 +137,9 @@ export default function App() {
       Alert.alert('Add an assignment', 'Write a short name first, like “Math worksheet”.');
       return;
     }
-    setTasks((current) => [{ id: String(Date.now()), title: newTask.trim(), due: newDue.trim() || 'No time set', repeat: newRepeat, done: false }, ...current]);
+    setTasks((current) => [{ id: String(Date.now()), title: newTask.trim(), due: newDue.trim() || 'No time set', repeat: newRepeat, location: newLocation.trim(), done: false }, ...current]);
     setNewTask('');
+    setNewLocation('');
   }
 
   function toggleTask(id) {
@@ -123,7 +188,15 @@ export default function App() {
   }
 
   const repeatOptions = ['Never', 'Every day', 'Every week'];
-  const calendarDays = ['Today', 'Tomorrow', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const calendarDays = getWeekDays(selectedDate);
+  const monthCells = getMonthCells(selectedDate);
+  const monthLabel = selectedDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const holidays = HOLIDAYS[holidayCountry] || HOLIDAYS.US;
+
+  function openMap(location) {
+    if (!location) return;
+    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`);
+  }
 
   async function saveHelperUrl(value) {
     setHelperUrl(value);
@@ -179,6 +252,7 @@ export default function App() {
               <View style={styles.addCard}>
                 <TextInput value={newTask} onChangeText={setNewTask} placeholder="What needs doing?" placeholderTextColor={colors.muted} style={styles.input} />
                 <TextInput value={newDue} onChangeText={setNewDue} placeholder="When?" placeholderTextColor={colors.muted} style={[styles.input, styles.dueInput]} />
+                <TextInput value={newLocation} onChangeText={setNewLocation} placeholder="Location (optional)" placeholderTextColor={colors.muted} style={[styles.input, styles.dueInput]} />
                 <Text style={styles.fieldLabel}>Repeat</Text>
                 <View style={styles.chipRow}>{repeatOptions.map((option) => <Pressable key={option} onPress={() => setNewRepeat(option)} style={[styles.chip, newRepeat === option && styles.chipActive]}><Text style={[styles.chipText, newRepeat === option && styles.chipTextActive]}>{option}</Text></Pressable>)}</View>
                 <Pressable onPress={addTask} style={styles.primaryButton}><Text style={styles.primaryText}>Add to my flow</Text></Pressable>
@@ -191,7 +265,7 @@ export default function App() {
                 <Pressable key={task.id} onPress={() => toggleTask(task.id)} style={[styles.taskCard, task.done && styles.taskDone]}>
                   <View style={[styles.check, task.done && styles.checkDone]}><Text style={styles.checkText}>{task.done ? '✓' : ''}</Text></View>
                   <View style={styles.taskCopy}><Text style={[styles.taskTitle, task.done && styles.taskTitleDone]}>{task.title}</Text><Text style={styles.taskDue}>{formatDue(task.due)}{task.repeat && task.repeat !== 'Never' ? ` · ${task.repeat}` : ''}</Text></View>
-                  <Text style={styles.chevron}>›</Text>
+                  {task.location ? <Pressable onPress={() => openMap(task.location)} style={styles.mapButton}><Text style={styles.mapButtonText}>Start map</Text></Pressable> : null}<Text style={styles.chevron}>›</Text>
                 </Pressable>
               ))}
 
@@ -201,11 +275,12 @@ export default function App() {
 
           {tab === 'calendar' && (
             <>
-              <View style={styles.aiIntro}><Text style={styles.aiBadge}>MY CALENDAR</Text><Text style={styles.aiTitle}>See the time clearly.</Text><Text style={styles.aiText}>Your assignments appear by day and time. Repeating plans stay visible all week.</Text></View>
-              {calendarDays.map((day, index) => {
-                const dayTasks = tasks.filter((task) => index === 0 || (task.repeat && task.repeat !== 'Never'));
-                return <View key={day} style={styles.dayCard}><View style={styles.dayHeader}><Text style={styles.dayTitle}>{day}</Text><Text style={styles.dayCount}>{dayTasks.length ? `${dayTasks.length} plan${dayTasks.length === 1 ? '' : 's'}` : 'Open'}</Text></View>{dayTasks.length ? dayTasks.map((task) => <View key={`${day}-${task.id}`} style={styles.eventRow}><View style={styles.timePill}><Text style={styles.timeText}>{getTimeLabel(task.due)}</Text></View><View style={styles.eventCopy}><Text style={styles.eventTitle}>{task.title}</Text><Text style={styles.eventRepeat}>{task.repeat && task.repeat !== 'Never' ? task.repeat : 'One time'}</Text></View></View>) : <Text style={styles.openDay}>Nothing planned yet.</Text>}</View>;
-              })}
+              <View style={styles.aiIntro}><Text style={styles.aiBadge}>MY CALENDAR</Text><Text style={styles.aiTitle}>See the time clearly.</Text><Text style={styles.aiText}>Switch between a week time grid and a month overview. Repeating plans and holidays stay visible.</Text></View>
+              <View style={styles.calendarToolbar}><Pressable onPress={() => setSelectedDate(new Date())} style={styles.todayButton}><Text style={styles.todayText}>Today</Text></Pressable><Pressable onPress={() => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() - (calendarMode === 'month' ? 30 : 7)))}><Text style={styles.navText}>‹</Text></Pressable><Text style={styles.calendarTitle}>{calendarMode === 'month' ? monthLabel : `${calendarDays[0].toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – ${calendarDays[6].toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`}</Text><Pressable onPress={() => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() + (calendarMode === 'month' ? 30 : 7)))}><Text style={styles.navText}>›</Text></Pressable></View>
+              <View style={styles.modeRow}><Pressable onPress={() => setCalendarMode('week')} style={[styles.modeButton, calendarMode === 'week' && styles.modeButtonActive]}><Text style={[styles.modeText, calendarMode === 'week' && styles.modeTextActive]}>Week</Text></Pressable><Pressable onPress={() => setCalendarMode('month')} style={[styles.modeButton, calendarMode === 'month' && styles.modeButtonActive]}><Text style={[styles.modeText, calendarMode === 'month' && styles.modeTextActive]}>Month</Text></Pressable></View>
+              <View style={styles.miniCalendar}><Text style={styles.miniTitle}>{monthLabel}</Text><View style={styles.miniGrid}>{monthCells.slice(0, 35).map((date) => <Pressable key={date.toISOString()} onPress={() => setSelectedDate(date)} style={[styles.miniDay, date.getMonth() !== selectedDate.getMonth() && styles.miniMuted, sameDay(date, selectedDate) && styles.miniSelected]}><Text style={[styles.miniDayText, sameDay(date, selectedDate) && styles.miniSelectedText]}>{date.getDate()}</Text></Pressable>)}</View></View>
+              {calendarMode === 'week' ? <View style={styles.weekGrid}><View style={styles.weekHeader}><Text style={styles.timeHeader}>TIME</Text>{calendarDays.map((date) => <Text key={date.toISOString()} style={[styles.weekDay, sameDay(date, selectedDate) && styles.selectedWeekDay]}>{date.toLocaleDateString(undefined, { weekday: 'short' })}{'\n'}{date.getDate()}</Text>)}</View>{Array.from({ length: 12 }, (_, hourIndex) => <View key={hourIndex} style={styles.timeRow}><Text style={styles.timeLabel}>{hourIndex + 7}:00</Text>{calendarDays.map((date) => { const holiday = getHolidayLabel(date, holidayCountry); const eventTasks = tasks.filter((task) => (sameDay(date, selectedDate) || (task.repeat && task.repeat !== 'Never')) && getTimeLabel(task.due).startsWith(String((hourIndex + 7) % 12 || 12))); return <View key={date.toISOString()} style={styles.timeCell}>{hourIndex === 0 && holiday ? <Text style={styles.holidayChip}>{holiday}</Text> : null}{eventTasks.map((task) => <Pressable key={task.id} onPress={() => task.location && openMap(task.location)} style={styles.calendarEvent}><Text style={styles.calendarEventText}>{task.title}</Text>{task.location ? <Text style={styles.mapHint}>Start map</Text> : null}</Pressable>)}</View>; })}</View>)}</View> : <View style={styles.monthGrid}>{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((label) => <Text key={label} style={styles.monthWeekday}>{label}</Text>)}{monthCells.map((date) => { const holiday = getHolidayLabel(date, holidayCountry); const dateTasks = tasks.filter((task) => sameDay(date, selectedDate) || (task.repeat && task.repeat !== 'Never')); return <Pressable key={date.toISOString()} onPress={() => setSelectedDate(date)} style={[styles.monthCell, date.getMonth() !== selectedDate.getMonth() && styles.miniMuted, sameDay(date, selectedDate) && styles.monthSelected]}><Text style={styles.monthDate}>{date.getDate()}</Text>{holiday ? <Text style={styles.monthHoliday}>{holiday}</Text> : null}{dateTasks.slice(0, 2).map((task) => <View key={task.id} style={styles.monthEvent}><Text numberOfLines={1} style={styles.monthEventText}>{task.title}</Text></View>)}</Pressable>; })}</View>}
+              <View style={styles.holidayPanel}><Text style={styles.sectionTitle}>National holidays</Text><View style={styles.chipRow}>{['US', 'CA', 'UK'].map((country) => <Pressable key={country} onPress={() => setHolidayCountry(country)} style={[styles.chip, holidayCountry === country && styles.chipActive]}><Text style={[styles.chipText, holidayCountry === country && styles.chipTextActive]}>{country}</Text></Pressable>)}</View><Text style={styles.helperHint}>Showing {holidayCountry} holiday dates for {selectedDate.getFullYear()}.</Text>{holidays.slice(0, 6).map(([key, label]) => <Text key={key} style={styles.holidayLine}>{label}</Text>)}</View>
             </>
           )}
 
@@ -245,5 +320,6 @@ function TabButton({ active, label, icon, onPress }) {
 const styles = StyleSheet.create({
   webStage: { flex: 1, minHeight: '100vh', backgroundColor: '#E9EAF0', alignItems: 'center' },
   webPhone: { width: 400, maxWidth: '100%', height: '100vh', overflow: 'hidden', backgroundColor: colors.soft, shadowColor: '#1C2340', shadowOpacity: 0.12, shadowRadius: 24, shadowOffset: { width: 0, height: 8 } },
+  calendarToolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }, todayButton: { borderWidth: 1, borderColor: colors.line, borderRadius: 10, paddingVertical: 7, paddingHorizontal: 10 }, todayText: { color: colors.ink, fontSize: 12, fontWeight: '800' }, navText: { color: colors.ink, fontSize: 28, lineHeight: 28, paddingHorizontal: 4 }, calendarTitle: { color: colors.ink, fontWeight: '800', fontSize: 14 }, modeRow: { flexDirection: 'row', backgroundColor: colors.card, borderRadius: 12, padding: 3, marginBottom: 12 }, modeButton: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 9 }, modeButtonActive: { backgroundColor: colors.ink }, modeText: { color: colors.muted, fontWeight: '800', fontSize: 12 }, modeTextActive: { color: '#fff' }, miniCalendar: { backgroundColor: colors.card, borderRadius: 16, padding: 13, marginBottom: 14, borderWidth: 1, borderColor: colors.line }, miniTitle: { color: colors.ink, fontWeight: '800', marginBottom: 8 }, miniGrid: { flexDirection: 'row', flexWrap: 'wrap' }, miniDay: { width: '14.285%', alignItems: 'center', paddingVertical: 5, borderRadius: 12 }, miniDayText: { color: colors.ink, fontSize: 11 }, miniMuted: { opacity: 0.35 }, miniSelected: { backgroundColor: colors.purple }, miniSelectedText: { color: '#fff', fontWeight: '800' }, weekGrid: { backgroundColor: colors.card, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: colors.line, marginBottom: 14 }, weekHeader: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.line, paddingVertical: 8 }, timeHeader: { width: 45, color: colors.muted, fontSize: 9, textAlign: 'center' }, weekDay: { flex: 1, color: colors.muted, fontSize: 10, textAlign: 'center', lineHeight: 15, fontWeight: '800' }, selectedWeekDay: { color: colors.purple }, timeRow: { flexDirection: 'row', minHeight: 42, borderBottomWidth: 1, borderBottomColor: colors.line }, timeLabel: { width: 45, color: colors.muted, fontSize: 9, textAlign: 'center', paddingTop: 9 }, timeCell: { flex: 1, borderLeftWidth: 1, borderLeftColor: colors.line, padding: 2 }, holidayChip: { backgroundColor: colors.green, color: '#fff', borderRadius: 5, fontSize: 8, padding: 3, overflow: 'hidden' }, calendarEvent: { backgroundColor: colors.purpleSoft, borderRadius: 5, padding: 4, marginTop: 2 }, calendarEventText: { color: colors.ink, fontSize: 8, fontWeight: '700' }, mapHint: { color: colors.purple, fontSize: 8, fontWeight: '800' }, monthGrid: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: colors.card, borderRadius: 16, padding: 5, borderWidth: 1, borderColor: colors.line, marginBottom: 14 }, monthWeekday: { width: '14.285%', color: colors.muted, fontSize: 9, fontWeight: '800', textAlign: 'center', paddingVertical: 6 }, monthCell: { width: '14.285%', minHeight: 62, borderTopWidth: 1, borderRightWidth: 1, borderColor: colors.line, padding: 4 }, monthSelected: { backgroundColor: colors.purpleSoft }, monthDate: { color: colors.ink, fontSize: 11, fontWeight: '800' }, monthHoliday: { color: colors.green, fontSize: 7, marginTop: 2 }, monthEvent: { backgroundColor: colors.purple, borderRadius: 3, paddingHorizontal: 3, marginTop: 3 }, monthEventText: { color: '#fff', fontSize: 7 }, holidayPanel: { backgroundColor: '#EAF8F0', borderRadius: 16, padding: 15, marginBottom: 18 }, holidayLine: { color: '#286B48', fontSize: 12, paddingTop: 7 }, mapButton: { backgroundColor: colors.purpleSoft, borderRadius: 8, paddingVertical: 5, paddingHorizontal: 7, marginLeft: 6 }, mapButtonText: { color: colors.purple, fontSize: 9, fontWeight: '800' },
   safe: { flex: 1, backgroundColor: colors.soft }, flex: { flex: 1 }, page: { padding: 22, paddingBottom: 130 }, headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }, eyebrow: { color: colors.purple, fontSize: 12, fontWeight: '800', letterSpacing: 2 }, title: { color: colors.ink, fontSize: 27, fontWeight: '800', marginTop: 6, maxWidth: 280 }, avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' }, avatarText: { color: '#fff', fontSize: 18, fontWeight: '800' }, heroCard: { backgroundColor: colors.ink, borderRadius: 24, padding: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 26 }, heroCopy: { flex: 1 }, heroKicker: { color: '#B9B4FF', fontSize: 11, fontWeight: '800', letterSpacing: 1.4 }, heroTitle: { color: '#fff', fontSize: 23, fontWeight: '800', marginTop: 7 }, heroText: { color: '#C9CBE0', fontSize: 13, marginTop: 7, lineHeight: 19 }, progressRing: { width: 72, height: 72, borderRadius: 36, borderWidth: 7, borderColor: colors.purple, alignItems: 'center', justifyContent: 'center', marginLeft: 14 }, progressText: { color: '#fff', fontWeight: '800', fontSize: 15 }, sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, sectionTitle: { color: colors.ink, fontSize: 17, fontWeight: '800', marginBottom: 12, marginTop: 4 }, count: { color: colors.muted, fontSize: 13, marginBottom: 12 }, addCard: { backgroundColor: colors.card, borderRadius: 18, padding: 15, marginBottom: 25, borderWidth: 1, borderColor: colors.line }, input: { color: colors.ink, borderBottomWidth: 1, borderBottomColor: colors.line, paddingVertical: 10, fontSize: 15 }, dueInput: { fontSize: 13, marginTop: 4 }, questionInput: { minHeight: 100, textAlignVertical: 'top', borderBottomWidth: 0 }, fieldLabel: { color: colors.muted, fontSize: 12, fontWeight: '700', marginTop: 14, marginBottom: 7 }, chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 }, chip: { paddingVertical: 8, paddingHorizontal: 11, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.soft }, chipActive: { backgroundColor: colors.purpleSoft, borderColor: colors.purple }, chipText: { color: colors.muted, fontSize: 12, fontWeight: '700' }, chipTextActive: { color: colors.purple }, primaryButton: { backgroundColor: colors.purple, borderRadius: 13, alignItems: 'center', padding: 14, marginTop: 14 }, voiceButton: { backgroundColor: colors.purpleSoft, borderRadius: 13, alignItems: 'center', padding: 12, marginTop: 12 }, voiceButtonActive: { backgroundColor: '#FFE9E8' }, voiceText: { color: colors.purple, fontSize: 13, fontWeight: '800' }, disabledButton: { opacity: 0.55 }, primaryText: { color: '#fff', fontSize: 15, fontWeight: '800' }, emptyCard: { backgroundColor: colors.card, borderRadius: 18, padding: 25, alignItems: 'center', borderWidth: 1, borderColor: colors.line }, emptyIcon: { color: colors.purple, fontSize: 26 }, emptyTitle: { color: colors.ink, fontWeight: '800', fontSize: 16, marginTop: 10 }, emptyText: { color: colors.muted, textAlign: 'center', lineHeight: 20, marginTop: 6 }, taskCard: { backgroundColor: colors.card, borderRadius: 17, padding: 16, marginBottom: 10, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.line }, taskDone: { opacity: 0.62 }, check: { width: 25, height: 25, borderRadius: 9, borderWidth: 2, borderColor: '#D8D9E5', alignItems: 'center', justifyContent: 'center', marginRight: 12 }, checkDone: { backgroundColor: colors.green, borderColor: colors.green }, checkText: { color: '#fff', fontWeight: '900' }, taskCopy: { flex: 1 }, taskTitle: { color: colors.ink, fontSize: 15, fontWeight: '700' }, taskTitleDone: { textDecorationLine: 'line-through' }, taskDue: { color: colors.muted, marginTop: 4, fontSize: 12 }, chevron: { color: colors.muted, fontSize: 25, marginLeft: 8 }, differenceCard: { backgroundColor: colors.purpleSoft, borderRadius: 18, padding: 18, marginTop: 20 }, differenceLabel: { color: colors.purple, fontWeight: '800', fontSize: 10, letterSpacing: 1.2 }, differenceTitle: { color: colors.ink, fontSize: 18, fontWeight: '800', marginTop: 8 }, differenceText: { color: colors.muted, lineHeight: 20, marginTop: 7 }, dayCard: { backgroundColor: colors.card, borderRadius: 18, padding: 16, marginBottom: 11, borderWidth: 1, borderColor: colors.line }, dayHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }, dayTitle: { color: colors.ink, fontSize: 17, fontWeight: '800' }, dayCount: { color: colors.purple, fontSize: 12, fontWeight: '700' }, eventRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.line }, timePill: { backgroundColor: colors.purpleSoft, borderRadius: 9, paddingVertical: 7, paddingHorizontal: 8, marginRight: 10 }, timeText: { color: colors.purple, fontSize: 11, fontWeight: '800' }, eventCopy: { flex: 1 }, eventTitle: { color: colors.ink, fontWeight: '700', fontSize: 14 }, eventRepeat: { color: colors.muted, fontSize: 11, marginTop: 3 }, openDay: { color: colors.muted, fontSize: 13 }, aiIntro: { backgroundColor: colors.purpleSoft, borderRadius: 22, padding: 21, marginBottom: 25 }, aiBadge: { color: colors.purple, fontWeight: '800', letterSpacing: 1.2, fontSize: 11 }, aiTitle: { color: colors.ink, fontWeight: '800', fontSize: 25, marginTop: 8 }, aiText: { color: colors.muted, lineHeight: 21, marginTop: 8, fontSize: 14 }, answerCard: { backgroundColor: colors.card, borderRadius: 18, padding: 18, borderWidth: 1, borderColor: colors.purple, marginBottom: 14 }, answerLabel: { color: colors.purple, fontWeight: '800', fontSize: 10, letterSpacing: 1.2 }, answerText: { color: colors.ink, fontSize: 15, lineHeight: 23, marginTop: 10 }, tipCard: { backgroundColor: colors.card, borderRadius: 18, padding: 18, borderWidth: 1, borderColor: colors.line, marginBottom: 14 }, tipTitle: { color: colors.ink, fontWeight: '800', fontSize: 15 }, tipText: { color: colors.muted, lineHeight: 20, marginTop: 7 }, safetyCard: { backgroundColor: '#FFF5E9', borderRadius: 16, padding: 16, marginBottom: 22 }, safetyTitle: { color: colors.orange, fontWeight: '800' }, safetyText: { color: '#8D6A42', lineHeight: 19, marginTop: 6, fontSize: 13 }, inputStandalone: { backgroundColor: colors.card, color: colors.ink, borderWidth: 1, borderColor: colors.line, borderRadius: 13, padding: 13, fontSize: 14 }, helperHint: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 7 }, messagesCard: { backgroundColor: colors.card, borderRadius: 22, padding: 24, alignItems: 'center', marginTop: 30 }, messageIcon: { color: colors.purple, fontSize: 38, marginBottom: 10 }, tabBar: { position: 'absolute', left: 16, right: 16, bottom: 18, height: 72, backgroundColor: colors.card, borderRadius: 22, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', borderWidth: 1, borderColor: colors.line }, tabButton: { alignItems: 'center', justifyContent: 'center', minWidth: 82 }, tabIcon: { color: colors.muted, fontSize: 21, marginBottom: 4 }, tabLabel: { color: colors.muted, fontSize: 11, fontWeight: '700' }, tabActive: { color: colors.purple },
 });
