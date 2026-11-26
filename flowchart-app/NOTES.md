@@ -7,6 +7,7 @@
 - Start Expo: `pnpm start`
 - Start the web version: `npx expo start --web` (or `pnpm web`)
 - The helper uses `getKey()` on the computer. The phone app never contains the key.
+- For local AI answers, put the real key in `flowchart-app/.env` as `OPENAI_API_KEY=...` or set `OPENAI_API_KEY` in the computer environment. Never commit `.env` or paste the key into chat.
 - The app connects to the helper at the computer's local Wi-Fi address. If using Expo Tunnel, set `EXPO_PUBLIC_HELPER_URL` to a reachable HTTPS/tunnel URL.
 
 ## Done
@@ -28,6 +29,8 @@
 - Added multi-date assignment selection and accepted both AM/PM and 24-hour time input.
 - Added homework photos through the camera/photo picker; the AI is instructed to teach with hints and similar examples instead of giving final answers.
 - Fixed the local web AI “Unexpected token” path by using the local helper during development and safely parsing responses.
+- Added a first-use chicken guide that explains assignments, Calendar, AI helper, and message app selection.
+- Added light/dark theme support using the device or browser color scheme.
 
 ## Maybe Later
 - Day Streak to keep people engaged.

@@ -7,6 +7,7 @@ const PORT = Number(process.env.FLOWCHART_PORT || 8787);
 const ENV_PATH = new URL('../.env', import.meta.url);
 
 function getKey() {
+  if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'paste-your-key-here') return process.env.OPENAI_API_KEY;
   try {
     const line = fs.readFileSync(ENV_PATH, 'utf8').split(/\r?\n/).find((item) => item.startsWith('OPENAI_API_KEY='));
     return line?.slice('OPENAI_API_KEY='.length).trim() || '';
