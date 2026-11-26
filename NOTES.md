@@ -18,6 +18,11 @@
 - Added a Calendar tab with day sections, visible times, and repeating plans.
 - Added Never / Every day / Every week choices when creating an assignment.
 - Added desktop-friendly web typing and a browser voice recorder that transcribes into the AI question box.
+- Added device-location detection with a country holiday lookup for the detected country.
+- Added a mini date picker inside the assignment form.
+- Added location suggestions while typing and Google Maps “Start map” links.
+- Added a message-app connection hub for TeamSnap, Instagram, Messages, Gmail, and more.
+- Updated the logo to an FC thunderbolt mark.
 
 ## Maybe Later
 - Day Streak to keep people engaged.
@@ -35,6 +40,8 @@
 - Connect Messages to TeamSnap (or a similar service) after the core demo is tested.
 - Test the helper with messy, incomplete notes and review AI answers before filming.
 - For voice notes on a laptop or PC, use a current Chrome or Edge browser and allow microphone access when asked.
+- Location and holiday lookup need location permission and an internet connection. If permission is declined, the calendar keeps the US preset.
+- The message hub UI is ready, but real inbox imports require each provider's OAuth app credentials and permission flow; no passwords are stored by FlowChart.
 
 ## Live run
 - Expo is started in the background with live reload.
