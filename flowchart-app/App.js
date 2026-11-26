@@ -370,7 +370,7 @@ export default function App() {
       if (!response.ok) throw new Error(data.error || 'The helper could not answer.');
       setAnswer(data.answer);
     } catch (error) {
-      setAnswer(error?.message || 'I could not reach the AI right now. Please check the Wi-Fi and the helper.');
+      setAnswer(error?.name === 'TypeError' ? 'FlowChart could not reach the AI helper. Start the helper on your computer, then try again.' : (error?.message || 'I could not reach the AI right now. Please check the Wi-Fi and the helper.'));
     } finally {
       setThinking(false);
     }
@@ -440,7 +440,7 @@ export default function App() {
 
           {tab === 'ai' && (
             <>
-              <Text style={styles.sectionTitle}>AI homework helper</Text><Text style={styles.helperHint}>Ask for hints, a similar example, or a next step. FlowChart will help you learn without giving away the answer.</Text>
+              <Text style={styles.sectionTitle}>AI helper</Text><Text style={styles.helperHint}>Ask for hints, a similar example, or a next step. FlowChart will help you learn without giving away the answer.</Text>
               <View style={styles.addCard}><TextInput value={question} onChangeText={setQuestion} placeholder="What are you stuck on?" placeholderTextColor={colors.muted} style={[styles.input, styles.questionInput]} multiline /><View style={styles.aiButtonRow}><Pressable onPress={recording ? stopVoiceNote : startVoiceNote} style={[styles.voiceButton, recording && styles.voiceButtonActive]}><Text style={styles.voiceText}>{recording ? '■ Stop voice' : '● Voice'}</Text></Pressable><Pressable onPress={addHomeworkPhoto} style={styles.voiceButton}><Text style={styles.voiceText}>{photoBusy ? 'Adding…' : '▣ Add photo'}</Text></Pressable></View>{homeworkImages.length ? <View style={styles.photoRow}>{homeworkImages.map((image, index) => <View key={`${image.uri}-${index}`} style={styles.photoWrap}><Image source={{ uri: image.uri }} style={styles.photoThumb} /><Pressable onPress={() => setHomeworkImages((current) => current.filter((_, photoIndex) => photoIndex !== index))}><Text style={styles.photoRemove}>×</Text></Pressable></View>)}</View> : null}<Pressable disabled={thinking} onPress={askAI} style={[styles.primaryButton, thinking && styles.disabledButton]}><Text style={styles.primaryText}>{thinking ? 'Thinking…' : 'Ask for a hint'}</Text></Pressable></View>
               {answer ? <View style={styles.answerCard}><Text style={styles.answerLabel}>FLOWCHART SAYS</Text><Text style={styles.answerText}>{answer}</Text></View> : <View style={styles.tipCard}><Text style={styles.tipTitle}>Try a real-life note</Text><Text style={styles.tipText}>“I have homework, violin, and swimming today. Help me make a plan with time to relax.”</Text></View>}
               <View style={styles.safetyCard}><Text style={styles.safetyTitle}>A safe suggestion</Text><Text style={styles.safetyText}>This is a suggestion, not a guarantee. Check the plan and change anything that does not fit your day.</Text></View>
