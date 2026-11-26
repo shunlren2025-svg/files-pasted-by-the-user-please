@@ -112,6 +112,10 @@ function formatDateLabel(date) {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function toDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 export default function App() {
   const [tab, setTab] = useState('planner');
   const [tasks, setTasks] = useState([]);
@@ -208,7 +212,7 @@ export default function App() {
       Alert.alert('Add an assignment', 'Write a short name first, like “Math worksheet”.');
       return;
     }
-    setTasks((current) => [{ id: String(Date.now()), title: newTask.trim(), date: newDate.toISOString().slice(0, 10), due: `${formatDateLabel(newDate)} · ${newDue.trim() || 'Any time'}`, repeat: newRepeat, location: newLocation.trim(), done: false }, ...current]);
+    setTasks((current) => [{ id: String(Date.now()), title: newTask.trim(), date: toDateKey(newDate), due: `${formatDateLabel(newDate)} · ${newDue.trim() || 'Any time'}`, repeat: newRepeat, location: newLocation.trim(), done: false }, ...current]);
     setNewTask('');
     setNewLocation('');
     setShowDatePicker(false);
@@ -274,7 +278,7 @@ export default function App() {
   }
 
   function getHolidayForDate(date) {
-    const key = date.toISOString().slice(0, 10);
+    const key = toDateKey(date);
     const dynamic = holidayEntries.find((entry) => entry.date === key);
     return dynamic?.localName || dynamic?.name || getHolidayLabel(date, holidayCountry);
   }
