@@ -25,16 +25,21 @@ export default async function handler(request, response) {
 
   try {
     const message = request.body?.message;
+    const images = request.body?.images;
     if (typeof message !== 'string' || !message.trim()) {
       response.status(400).json({ error: 'Please enter a question or planning note.' });
       return;
     }
 
     const apiKey = await getKey();
+    const content = [{ type: 'input_text', text: message.trim() }];
+    for (const image of Array.isArray(images) ? images.slice(0, 3) : []) {
+      if (typeof image === 'string' && image.startsWith('data:image/')) content.push({ type: 'input_image', image_url: image });
+    }
     const openAiResponse = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: MODEL, instructions: AI_INSTRUCTIONS, input: message.trim() }),
+      body: JSON.stringify({ model: MODEL, instructions: AI_INSTRUCTIONS, input: [{ role: 'user', content }] }),
     });
     const result = await openAiResponse.json().catch(() => ({}));
     if (!openAiResponse.ok) throw new Error('The AI could not answer right now. Please try again.');

@@ -49,7 +49,7 @@ const server = http.createServer(async (request, response) => {
   request.on('data', (chunk) => { raw += chunk; });
   request.on('end', async () => {
     try {
-      const { message } = JSON.parse(raw || '{}');
+      const { message, images = [] } = JSON.parse(raw || '{}');
       if (typeof message !== 'string' || !message.trim()) {
         sendJson(response, 400, { error: 'Please enter a question or planning note.' });
         return;
@@ -59,10 +59,14 @@ const server = http.createServer(async (request, response) => {
         sendJson(response, 503, { error: 'The AI helper needs a valid key in the local .env file.' });
         return;
       }
+      const content = [{ type: 'input_text', text: message.trim() }];
+      for (const image of Array.isArray(images) ? images.slice(0, 3) : []) {
+        if (typeof image === 'string' && image.startsWith('data:image/')) content.push({ type: 'input_image', image_url: image });
+      }
       const openAiResponse = await fetch('https://api.openai.com/v1/responses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model: MODEL, instructions: AI_INSTRUCTIONS, input: message })
+        body: JSON.stringify({ model: MODEL, instructions: AI_INSTRUCTIONS, input: [{ role: 'user', content }] })
       });
       const result = await openAiResponse.json();
       if (!openAiResponse.ok) {

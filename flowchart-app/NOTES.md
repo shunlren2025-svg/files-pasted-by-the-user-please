@@ -23,6 +23,11 @@
 - Added location suggestions while typing and Google Maps “Start map” links.
 - Added a message-app connection hub for TeamSnap, Instagram, Messages, Gmail, and more.
 - Updated the logo to an FC thunderbolt mark.
+- Removed the extra “What makes FlowChart different” and AI intro cards.
+- Added a Guide tab explaining assignments, Calendar, AI homework help, and message app selection.
+- Added multi-date assignment selection and accepted both AM/PM and 24-hour time input.
+- Added homework photos through the camera/photo picker; the AI is instructed to teach with hints and similar examples instead of giving final answers.
+- Fixed the local web AI “Unexpected token” path by using the local helper during development and safely parsing responses.
 
 ## Maybe Later
 - Day Streak to keep people engaged.
@@ -42,6 +47,7 @@
 - For voice notes on a laptop or PC, use a current Chrome or Edge browser and allow microphone access when asked.
 - Location and holiday lookup need location permission and an internet connection. If permission is declined, the calendar keeps the US preset.
 - The message hub UI is ready, but real inbox imports require each provider's OAuth app credentials and permission flow; no passwords are stored by FlowChart.
+- Message app selection is now a single picker instead of a list of connection cards. Actual provider sign-in/import still needs OAuth credentials for each service.
 
 ## Live run
 - Expo is started in the background with live reload.
