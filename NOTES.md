@@ -15,6 +15,9 @@
 - Added an AI Homework Helper screen with Thinking state, safe assumptions, choices, and the required disclaimer.
 - Added a small Node helper that sends the brief's AI instructions with every request.
 - Added Messages as a clear placeholder for the next integration.
+- Added a Calendar tab with day sections, visible times, and repeating plans.
+- Added Never / Every day / Every week choices when creating an assignment.
+- Added desktop-friendly web typing and a browser voice recorder that transcribes into the AI question box.
 
 ## Maybe Later
 - Day Streak to keep people engaged.
@@ -31,6 +34,7 @@
 ## Next
 - Connect Messages to TeamSnap (or a similar service) after the core demo is tested.
 - Test the helper with messy, incomplete notes and review AI answers before filming.
+- For voice notes on a laptop or PC, use a current Chrome or Edge browser and allow microphone access when asked.
 
 ## Live run
 - Expo is started in the background with live reload.
